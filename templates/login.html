@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Control Console - Secure Authentication</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="card animated-fade">
+        <h2 id="title">Portal Gateway</h2>
+        <div id="authBox">
+            <input type="text" id="username" placeholder="Username">
+            <input type="password" id="password" placeholder="Password">
+            <button onclick="handleAuth()" id="actionBtn">Log In</button>
+            <p style="text-align:center; font-size:14px; color:#94a3b8; cursor:pointer;" onclick="toggleView()" id="toggleMsg">Need an account? Register</p>
+        </div>
+    </div>
+    <script>
+        let isLogin = true;
+        function toggleView() {
+            isLogin = !isLogin;
+            document.getElementById('title').innerText = isLogin ? "Portal Gateway" : "Create Account";
+            document.getElementById('actionBtn').innerText = isLogin ? "Log In" : "Register";
+            document.getElementById('toggleMsg').innerText = isLogin ? "Need an account? Register" : "Already have an account? Log In";
+        }
+        async function handleAuth() {
+            let url = isLogin ? '/api/auth/login' : '/api/auth/register';
+            let res = await fetch(url, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    username: document.getElementById('username').value,
+                    password: document.getElementById('password').value
+                })
+            });
+            let data = await res.json();
+            if(res.ok) {
+                if(isLogin) window.location.href = data.role === 'admin' ? '/admin' : '/user';
+                else { alert('Registration submitted for approval.'); toggleView(); }
+            } else {
+                alert(data.error || 'Authentication Matrix Denied');
+            }
+        }
+    </script>
+</body>
+</html>

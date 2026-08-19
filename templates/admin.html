@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Central Control Matrix Operational HQ</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="animated-fade">
+    <div class="nav">
+        <h2>Cyclone Core Control Operations Command</h2>
+        <button onclick="location.href='/'" style="width:auto;">View Active Frontend Portal</button>
+    </div>
+
+    <div class="container">
+        <div class="main-panel card">
+            <h3>System User Registries Logs</h3>
+            <table>
+                <thead>
+                    <tr><th>Username</th><th>Approval Status</th><th>Net Routing Link Status</th><th>Execution Commands</th></tr>
+                </thead>
+                <tbody id="userTableBody"></tbody>
+            </table>
+        </div>
+        
+        <div class="side-panel card">
+            <h3>Engine Live Configuration Parameters</h3>
+            <label>Inject Base URL Target</label>
+            <input type="text" id="indexUrl">
+            <label>Raw HTML Matrix Target</label>
+            <textarea id="customHtml" rows="4"></textarea>
+            <label><input type="checkbox" id="maintMode" style="width:auto; margin-right:8px;"> Engage Crisis Lockout Mode</label>
+            <input type="text" id="maintNotice" placeholder="Custom notice alert...">
+            <button onclick="saveAdminSettings()" style="margin-top:15px; background:#16a34a;">Commit Global Parameters Changes</button>
+            
+            <hr style="border:1px solid #334155; margin:20px 0;">
+            <h3>Broadcast Targeted Telemetry Alert</h3>
+            <textarea id="notifMessage" rows="2" placeholder="Enter marquee network alert notice..."></textarea>
+            <button onclick="broadcastAlert()" style="margin-top:10px; background:#3b82f6;">Dispatch Network Stream Broadcast</button>
+            
+            <hr style="border:1px solid #334155; margin:20px 0;">
+            <h3>Admin Authentication Security Configuration</h3>
+            <input type="password" id="oldPass" placeholder="Current Admin Password">
+            <input type="password" id="newPass" placeholder="New Security Key Target">
+            <button onclick="commitPasswordChange()" style="background:#dc2626;">Execute Security Protocol Re-Key</button>
+        </div>
+    </div>
+
+    <script>
+        async function fetchAdminState() {
+            let sRes = await fetch('/api/admin/settings');
+            let settings = await sRes.json();
+            document.getElementById('indexUrl').value = settings.index_url || '';
+            document.getElementById('customHtml').value = settings.custom_html || '';
+            document.getElementById('maintMode').checked = settings.maintenance_mode === true || settings.maintenance_mode === 'true';
+            document.getElementById('maintNotice').value = settings.maintenance_notice || '';
+
+            let uRes = await fetch('/api/admin/users');
+            let users = await uRes.json();
+            let tbody = document.getElementById('userTableBody');
+            tbody.innerHTML = '';
+
+            Object.entries(users).forEach(([username, u]) => {
+                if(u.role === 'admin') return;
+                let tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>${username}</b></td>
+                    <td><span class="badge ${u.approval_status}">${u.approval_status}</span></td>
+                    <td>${u.internet_access ? '🟢 Dynamic Active Pipeline' : '🔴 Blocked Link Node'}</td>
+                    <td>
+                        ${u.approval_status === 'pending' ? 
+                            `<button onclick="actionUser('${username}', 'approve')" style="background:#16a34a; padding:4px 8px; width:auto; margin-right:5px;">Approve</button>
+                             <button onclick="actionUser('${username}', 'reject')" style="background:#dc2626; padding:4px 8px; width:auto;">Reject</button>` : 
+                            `<button onclick="actionUser('${username}', 'toggle_internet')" style="background:#ca8a04; padding:4px 8px; width:auto;">${u.internet_access ? 'Sever Stream' : 'Enable Link'}</button>`
+                        }
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        async function actionUser(username, action) {
+            await fetch('/api/action-user' if action==='' else '/api/admin/action-user', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ username, action })
+            });
+            fetchAdminState();
+        }
+
+        async function saveAdminSettings() {
+            await fetch('/api/admin/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    index_url: document.getElementById('indexUrl').value,
+                    custom_html: document.getElementById('customHtml').value,
+                    maintenance_mode: document.getElementById('maintMode').checked,
+                    maintenance_notice: document.getElementById('maintNotice').value
+                })
+            });
+            alert('Global control directives configured successfully.');
+            fetchAdminState();
+        }
+
+        async function broadcastAlert() {
+            let msg = document.getElementById('notifMessage').value;
+            let res = await fetch('/api/admin/send-notification', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ message: msg })
+            });
+            if(res.ok) { alert('Marquee message buffered to pipeline.'); document.getElementById('notifMessage').value = ''; }
+        }
+
+        async function commitPasswordChange() {
+            let oldP = document.getElementById('oldPass').value;
+            let newP = document.getElementById('newPass').value;
+            let res = await fetch('/api/admin/change-password', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ old_password: oldP, new_password: newP })
+            });
+            if(res.ok) { alert('Security matrix key update complete. Admin password changed.'); document.getElementById('oldPass').value=''; document.getElementById('newPass').value=''; }
+            else { alert('Failed: Current admin authorization token is incorrect.'); }
+        }
+
+        fetchAdminState();
+        setInterval(fetchAdminState, 5000);
+    </script>
+</body>
+</html>

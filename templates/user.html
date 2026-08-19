@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Dynamic Portal Workspace</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+    <script src="/static/js/deviceId.js"></script>
+</head>
+<body class="animated-fade">
+    <div class="marquee-container" id="marqueeBox" style="display:none;">
+        <div class="marquee-text" id="marqueeMsg"></div>
+    </div>
+    <div class="nav">
+        <h2>User Space Control Terminal</h2>
+        <div style="display:flex; gap:10px;">
+            <button onclick="toggleFullScreen()" style="width:auto; background:#10b981;">Go Fullscreen</button>
+            <button onclick="logout()" style="width:auto; background:#ef4444;">Disconnect</button>
+        </div>
+    </div>
+    
+    <div id="maintenanceAlert" class="card" style="display:none; background:#b45309;">
+        <h3>⚠️ Operational Interruption</h3>
+        <p id="maintenanceNotice"></p>
+    </div>
+
+    <div id="appContainer" style="margin-top:20px;">
+        <div id="dynamicFrame"></div>
+    </div>
+
+    <script>
+        const devId = getDeviceFingerprint();
+        
+        function toggleFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(err => {
+                    alert(`Error attempting to enable fullscreen: ${err.message}`);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        async function runPing() {
+            let res = await fetch('/api/device/ping', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ deviceId: devId })
+            });
+            if (res.status === 403 || res.status === 401) {
+                alert('Session Interrupted: Disconnected by central terminal administrative override.');
+                window.location.href = '/login';
+                return;
+            }
+            let data = await res.json();
+            
+            if(data.maintenance) {
+                document.getElementById('maintenanceAlert').style.display = 'block';
+                document.getElementById('maintenanceNotice').innerText = data.notice;
+                document.getElementById('appContainer').style.display = 'none';
+            } else {
+                document.getElementById('maintenanceAlert').style.display = 'none';
+                document.getElementById('appContainer').style.display = 'block';
+            }
+
+            if(data.notification) {
+                document.getElementById('marqueeBox').style.display = 'block';
+                document.getElementById('marqueeMsg').innerText = "📢 ALERT CRITICAL NOTIFICATION: " + data.notification;
+            } else {
+                document.getElementById('marqueeBox').style.display = 'none';
+            }
+        }
+
+        async function syncEngine() {
+            let res = await fetch('/api/public/settings');
+            let settings = await res.json();
+            let frame = document.getElementById('dynamicFrame');
+            
+            if(settings.index_url && settings.index_url !== 'https://example.com') {
+                if(!frame.querySelector('iframe') || frame.querySelector('iframe').src !== settings.index_url) {
+                    frame.innerHTML = `<iframe src="${settings.index_url}"></iframe>`;
+                }
+            } else {
+                frame.innerHTML = settings.custom_html || '<h1>No content broadcast matrix detected.</h1>';
+            }
+        }
+
+        async function logout() {
+            await fetch('/api/auth/logout', {method: 'POST'});
+            window.location.href = '/login';
+        }
+
+        runPing(); syncEngine();
+        setInterval(runPing, 3000);
+        setInterval(syncEngine, 5000);
+    </script>
+</body>
+</html>
